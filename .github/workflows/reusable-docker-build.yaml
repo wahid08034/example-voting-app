@@ -1,0 +1,39 @@
+name: Build Docker Image
+
+on: [workflow_dispatch]  # Triggered manually by calling workflow
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Runner OS
+    steps:
+      - uses: actions/checkout@v3  # Checkout code from repository
+      - name: Login to Docker registry (optional)
+        if: ${{ needs docker_login }}  # Only run if needed
+        uses: ${{ needs.docker_login.outputs.login_action }}  # Use login action output
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build context
+        run: cd result  # Change directory to build context (replace with your path)
+      # Build the image using Dockerfile
+      - name: Build Docker Image
+        run: docker build -t ${{ inputs.image_name }} .  # Use input for image name
+
+    needs:
+      docker_login:  # Optional login step (conditional)
+        if: ${{ needs.docker_login }}  # Only required if pushing to Docker Hub
+        steps:
+          - name: Check for Docker Hub credentials
+            run: |
+              if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+                echo "Missing Docker Hub credentials. Set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets."
+                exit 1
+              fi
+          - name: Login to Docker Hub (optional)
+            id: docker_login
+            run: docker login docker.io -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+            outputs:
+              login_action: ${{ steps.docker_login.run }}  # Output the login action
+
+defaults:
+  run: ${{ steps.build.outputs.docker.build.image_digest }}  # Example output (optional)
